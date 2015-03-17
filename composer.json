@@ -14,9 +14,9 @@
         }
     ],
     "support": {
-        "issues": "https://github.com/mgp25/Snap-API/issues",
-        "wiki": "https://github.com/mgp25/Snap-API/wiki",
-        "source": "https://github.com/mgp25/Snap-API"
+        "issues": "https://github.com/advt/Snap-API/issues",
+        "wiki": "https://github.com/advt/Snap-API/wiki",
+        "source": "https://github.com/advt/Snap-API"
     },
     "autoload": {
         "classmap": [
