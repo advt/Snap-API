@@ -11,7 +11,7 @@ abstract class SnapchatAgent {
 	 * Before updating this value, confirm
 	 * that the library requests everything in the same way as the app.
 	 */
-	const VERSION = 'Snapchat/9.0.2.0';
+	const USER_AGENT = 'Snapchat/9.8.0.0 (HTC One; Android 4.4.2#302626.7#19; gzip)';
 
 	/*
 	 * The API URL. We're using the /bq endpoint, the one that the iPhone
@@ -45,6 +45,8 @@ abstract class SnapchatAgent {
 	 */
 	const HASH_PATTERN = '0001110111101110001111010101111011010001001110011000110001000110'; // Hash pattern
 
+	protected $proxyServer;
+
 	/**
 	 * Default cURL options. It doesn't appear that the UA matters, but
 	 * authenticity, right?
@@ -53,15 +55,24 @@ abstract class SnapchatAgent {
 		CURLOPT_CONNECTTIMEOUT => 5,
 		CURLOPT_RETURNTRANSFER => TRUE,
 		CURLOPT_TIMEOUT => 10,
-		CURLOPT_USERAGENT => 'Snapchat/9.2.0.0 (A0001; Android 4.4.4#5229c4ef56#19; gzip)',
+		CURLOPT_USERAGENT => self::USER_AGENT,
 		CURLOPT_HTTPHEADER => array('Accept-Language: en', 'Accept-Locale: en_US'),
 	);
-
+	public $gauth = "";
 	public static $CURL_HEADERS = array(
-		'Accept-Language: en;q=1',
-		'Accept-Locale: en'
+		'Accept-Language: en',
+		'Accept-Locale: en_US'
 	);
-
+	public function getGAuth(){
+		return (!empty($this->gauth) ? $this->gauth : "");
+	}
+	public function setGAuth($auth)
+	{
+		if (is_array($auth))
+				$this->gauth = $auth['auth'];
+		else
+				$this->gauth = $auth;
+	}
 	/**
 	 * Returns the current timestamp.
 	 *
@@ -259,12 +270,13 @@ abstract class SnapchatAgent {
 				else
 				{
 				    unlink("./temp");
-					return FALSE;
+						return FALSE;
 				}
 			}
 			zip_close($resource);
 		}
-        unlink("./temp");
+    unlink("./temp");
+
 		return $result;
 	}
 
@@ -283,7 +295,9 @@ abstract class SnapchatAgent {
 	 */
 	public function get($endpoint)
 	{
-		return file_get_contents(self::URL . $endpoint);
+		$ch = curl_init();
+		curl_setopt_array($ch, array(CURLOPT_RETURNTRANSFER => 1, CURLOPT_USERAGENT => self::USER_AGENT, CURLOPT_HTTPHEADER => array('Accept-Language: en', 'Accept-Locale: en_US'),CURLOPT_URL => self::URL . $endpoint, CURLOPT_CAINFO => dirname(__FILE__) . '/ca_bundle.crt'));
+		return curl_exec($ch);
 	}
 
 	/**
@@ -320,6 +334,7 @@ abstract class SnapchatAgent {
 		}
 		else
 		{
+
             $datas = "--".$boundary."\r\n" . 'Content-Disposition: form-data; name="req_token"' . "\r\n\r\n" . self::hash($params[0], $params[1]) . "\r\n";
             foreach($data as $key => $value)
             {
@@ -345,24 +360,26 @@ abstract class SnapchatAgent {
 
 		if($endpoint == "/loq/login")
 		{
-				$headers = array_merge(self::$CURL_HEADERS, array("Authorization: Bearer {$params[2]}"));
+			$headers = array_merge(self::$CURL_HEADERS, array(
+				"X-Snapchat-Client-Auth-Token: Bearer {$params[2]}",
+				"Accept-Encoding: gzip"));
 		}
 		else
 		{
-			$headers = self::$CURL_HEADERS;
+			$headers = array_merge(self::$CURL_HEADERS, array("X-Snapchat-Client-Auth-Token: Bearer ". $this->gauth));
 		}
 
 		if($multipart)
 		{
-            $headers = array_merge($headers, array("X-Timestamp: 0","Content-Type: multipart/form-data; boundary=$boundary"));
+			$headers = array_merge($headers, array("X-Timestamp: 0","Content-Type: multipart/form-data; boundary=$boundary"));
 		}
 
 		if($endpoint == '/ph/blob' || $endpoint == '/bq/blob' || $endpoint == '/bq/chat_media')
 		{
 		    $headers = array_merge($headers, array("X-Timestamp: " . $params[1]));
-			$options += array(
-				CURLOPT_URL => self::URL . $endpoint . "?{$data}"
-			);
+				$options += array(
+					CURLOPT_URL => self::URL . $endpoint . "?{$data}"
+				);
 		}
 		else
 		{
@@ -374,19 +391,36 @@ abstract class SnapchatAgent {
 		}
 		curl_setopt_array($ch, $options);
 		curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
+		$headerBuff = tmpfile();
+		curl_setopt($ch, CURLOPT_WRITEHEADER, $headerBuff);
+		curl_setopt($ch, CURLOPT_PROXY, $this->proxyServer);
 		$result = curl_exec($ch);
+
+
+		if(strlen($result) > 0) //make sure curl worked. if not, keep going
+		{
+			if($endpoint == "/loq/login") $result = gzdecode($result);
+		}
+
 		if($debug)
 		{
 			$info = curl_getinfo($ch);
 			echo "\nREQUEST TO: " .self::URL . $endpoint . "\n";
-			echo "\nSent Request info: " .print_r($info['request_header'], true). "\n";
+			if(isset($info['request_header']))
+					echo "\nSent Request info: " .print_r($info['request_header'], true). "\n";
 			if(is_array($data))
 			{
-				echo 'DATA: ' . print_r($data) . "\n";
+					if ($multipart)
+				  		echo 'DATA: ' . strlen($data) . " byte data\n";
+					else
+							echo 'DATA: ' . print_r($data) . "\n";
 			}
 			else
 			{
-				echo 'DATA: ' . $data . "\n";
+				if ($multipart)
+						echo 'DATA: ' . strlen($data) . " byte data\n";
+				else
+						echo 'DATA: ' . $data . "\n";
 			}
 
 			if($endpoint == "/loq/login" || $endpoint == "/all_updates")
@@ -398,9 +432,30 @@ abstract class SnapchatAgent {
 			{
 				echo 'RESULT: ' . $result . "\n";
 			}
+
+			if($endpoint == '/loq/register_username' || $endpoint == '/loq/register')
+			{
+				$jsonResult = json_decode($result);
+				if(isset($jsonResult->logged) && $jsonResult->logged == false)
+				{
+					echo "\n" . 'ERROR: There was an error registering your account: ' . $jsonResult->message . "\n";
+					exit();
+				}
+			}
+
 			if($endpoint == "/bq/get_captcha")
 			{
-				file_put_contents(__DIR__.'/captcha.zip', $result);
+				file_put_contents(__DIR__."/captcha.zip", $result);
+				rewind($headerBuff);
+				$headers = stream_get_contents($headerBuff);
+				if(preg_match('/^Content-Disposition: .*?filename=(?<f>[^\s]+|\x22[^\x22]+\x22)\x3B?.*$/m', $headers, $matches))
+				{
+					$filename = trim($matches['f'],' ";');
+					rename(__DIR__."/captcha.zip", __DIR__."/{$filename}");
+					return $filename;
+				}
+				fclose($headerBuff);
+				return "captcha.zip";
 			}
 		}
 
@@ -416,13 +471,16 @@ abstract class SnapchatAgent {
 		// since the API generally won't return friendly errors.
 		if($result === FALSE)
 		{
+
 			curl_close($ch);
 
 			return $result;
 		}
 
+
 		if(curl_getinfo($ch, CURLINFO_HTTP_CODE) != 200)
 		{
+
 				$return['data'] = $result;
 				$return['test'] = 1;
 				$return['code'] = curl_getinfo($ch, CURLINFO_HTTP_CODE);
@@ -446,8 +504,46 @@ abstract class SnapchatAgent {
 		$result = iconv('UTF-8', 'UTF-8//IGNORE', utf8_encode($result));
 
 		$return['data'] = json_decode($result);
-
 		return $return;
 	}
 
+	public function posttourl($url, $data) {
+		$ch = curl_init();
+		$options = self::$CURL_OPTIONS + array(
+			CURLOPT_POST => TRUE,
+			CURLOPT_POSTFIELDS => $data,
+			CURLOPT_URL => $url,
+		);
+		curl_setopt_array($ch, $options);
+		curl_setopt($ch, CURLOPT_HTTPHEADER, self::$CURL_HEADERS);
+
+		$result = curl_exec($ch);
+		if (curl_errno($ch) == 60) {
+			curl_setopt($ch, CURLOPT_CAINFO, dirname(__FILE__) . '/ca_bundle.crt');
+			$result = curl_exec($ch);
+		}
+		if ($result === FALSE)
+		{
+			curl_close($ch);
+			return $result;
+		}
+		if(curl_getinfo($ch, CURLINFO_HTTP_CODE) != 200)
+		{
+				$return['data'] = $result;
+				$return['test'] = 1;
+				$return['code'] = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+				curl_close($ch);
+				return $return;
+		}
+		curl_close($ch);
+		$return['error'] = 0;
+		$result = iconv('UTF-8', 'UTF-8//IGNORE', utf8_encode($result));
+		$return['data'] = json_decode($result);
+		return $return;
+	}
+
+	public function setProxyServer ($proxyServer)
+	{
+			$this->proxyServer = $proxyServer;
+	}
 }

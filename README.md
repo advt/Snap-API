@@ -1,8 +1,6 @@
-# Snap API
+# SnAPI Chat
 
-Interface to Snapchat
-
-**Read the [wiki](https://github.com/mgp25/Snap-API/wiki)** and previous issues before opening a new one! Maybe your issue is already answered.
+**Read the [wiki](https://github.com/mgp25/SnAPI-Chat/wiki)** and previous issues before opening a new one! Maybe your issue is already answered.
 
 ----------
 
@@ -16,5 +14,15 @@ Interface to Snapchat
 
 Based on [JorgenPhi](https://github.com/JorgenPhi/php-snapchat) code.
 
+[![Gitter](https://badges.gitter.im/Join%20Chat.svg)](https://gitter.im/mgp25/SnAPI-Chat)
+
+[![Paypal](https://www.paypalobjects.com/en_US/i/btn/btn_donate_SM.gif)](https://www.paypal.com/cgi-bin/webscr?cmd=_s-xclick&hosted_button_id=QZY4JX3P7278Y)
+
+**Bitcoin:** 15NejBDahfe1eLAPSJh4iMfYLHYuKDrwJ2
+
 ## License
 MIT
+
+## Legal
+
+This code is in no way affiliated with, authorized, maintained, sponsored or endorsed by Snapchat or any of its affiliates or subsidiaries. This is an independent and unofficial API. Use at your own risk.
